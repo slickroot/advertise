@@ -60,25 +60,6 @@ describe('AppController (e2e)', () => {
     app = moduleFixture.createNestApplication();
     helpers = new Helpers(app);
 
-    await User.destroy({
-      where: {},
-    });
-    await Ad.destroy({
-      where: {},
-    });
-
-    users = [
-      await User.create({ firstName: 'Hamid', lastName: 'Zahir' }),
-      await User.create({ firstName: 'Marouane', lastName: 'Elaich' }),
-      await User.create({ firstName: 'Simone', lastName: 'Erl' }),
-      await User.create({ firstName: 'Sarah', lastName: 'Salim' }),
-    ];
-
-    ads = [
-      await Ad.create({ targetingCriteria: 'fashion' }),
-      await Ad.create({ targetingCriteria: 'crypto' }),
-    ];
-
     await app.init();
   });
 
@@ -88,13 +69,16 @@ describe('AppController (e2e)', () => {
 
   it('Mobile app can notify the API with webhooks and the system updates', async () => {
     // We're seeding the database on this test with a bunch of users, and ads.
-    // We have four users on the DB, and two ads
+    await request(app.getHttpServer()).post('/seed').send().expect(201);
+
+    // We have at least four users on the DB, and two ads
     await request(app.getHttpServer())
       .get('/ads')
       .expect(200)
       .then((response) => {
         // 2 ads
         expect(response.body).toHaveLength(2);
+        ads = response.body;
       });
 
     await request(app.getHttpServer())
@@ -103,6 +87,7 @@ describe('AppController (e2e)', () => {
       .then((response) => {
         // 4 users
         expect(response.body).toHaveLength(4);
+        users = response.body;
       });
 
     // let's say Sarah and Simone match all ads

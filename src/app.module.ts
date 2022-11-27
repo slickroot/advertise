@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { AdsModule } from './ads/ads.module';
 import { HooksModule } from './hooks/hooks.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { SeederModule } from './seeder/seeder.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     UsersModule,
     AdsModule,
     HooksModule,
+    SeederModule,
   ],
   controllers: [AppController],
   providers: [AppService],
