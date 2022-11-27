@@ -1,5 +1,5 @@
 import { Column, Model, Table, ForeignKey } from 'sequelize-typescript';
-import { User } from './user.model';
+import { User } from '../users/user.model';
 import { Ad } from '../ads/ad.model';
 
 @Table
@@ -11,4 +11,10 @@ export class User_Ad extends Model {
   @ForeignKey(() => Ad)
   @Column
   ad: number;
+
+  @Column({ defaultValue: false })
+  isRead: boolean;
+
+  @Column
+  period: number;
 }

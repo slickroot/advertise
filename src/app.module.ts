@@ -4,9 +4,12 @@ import { AppService } from './app.service';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { UsersModule } from './users/users.module';
 import { AdsModule } from './ads/ads.module';
+import { HooksModule } from './hooks/hooks.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot(),
     SequelizeModule.forRoot({
       dialect: 'postgres',
       host: 'postgres',
@@ -20,6 +23,7 @@ import { AdsModule } from './ads/ads.module';
     }),
     UsersModule,
     AdsModule,
+    HooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -3,9 +3,54 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { User } from './../src/users/user.model';
+import { Ad } from './../src/ads/ad.model';
+import { User_Ad } from './../src/hooks/user_ad.model';
+
+class Helpers {
+  private app: INestApplication;
+
+  constructor(app: INestApplication) {
+    this.app = app;
+  }
+
+  async notifyUserMatchedAd(user: User, ad: Ad) {
+    await request(this.app.getHttpServer())
+      .post(`/hooks?user=${user.id}`)
+      .send({ id: 'USER_MATCHES_AD', payload: { adId: ad.id } })
+      .expect(201);
+  }
+
+  async notifyUserReadAd(user: User, ad: Ad, period: number) {
+    await request(this.app.getHttpServer())
+      .post(`/hooks?user=${user.id}`)
+      .send({ id: 'USER_READS_AD', payload: { period, adId: ad.id } })
+      .expect(201);
+  }
+
+  async fetchReadAds(userId: number) {
+    return request(this.app.getHttpServer())
+      .get(`/ads/read?user=${userId}`)
+      .expect(200)
+      .then((response) => {
+        return response.body;
+      });
+  }
+
+  async fetchMatchedAds(userId: number) {
+    return request(this.app.getHttpServer())
+      .get(`/ads/matched?user=${userId}`)
+      .expect(200)
+      .then((response) => {
+        return response.body;
+      });
+  }
+}
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
+  let helpers: Helpers;
+  let users: User[];
+  let ads: Ad[];
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -13,25 +58,134 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    await User.create({ firstName: 'Hamid', lastName: 'Zahir' });
+    helpers = new Helpers(app);
+
+    await User.destroy({
+      where: {},
+    });
+    await Ad.destroy({
+      where: {},
+    });
+
+    users = [
+      await User.create({ firstName: 'Hamid', lastName: 'Zahir' }),
+      await User.create({ firstName: 'Marouane', lastName: 'Elaich' }),
+      await User.create({ firstName: 'Simone', lastName: 'Erl' }),
+      await User.create({ firstName: 'Sarah', lastName: 'Salim' }),
+    ];
+
+    ads = [
+      await Ad.create({ targetingCriteria: 'fashion' }),
+      await Ad.create({ targetingCriteria: 'crypto' }),
+    ];
+
     await app.init();
   });
 
   afterEach(async () => {
-    await User.destroy({
-      where: {},
-    });
     await app.close();
   });
 
-  it('/users', async () => {
+  it('Mobile app can notify the API with webhooks and the system updates', async () => {
+    // We're seeding the database on this test with a bunch of users, and ads.
+    // We have four users on the DB, and two ads
+    await request(app.getHttpServer())
+      .get('/ads')
+      .expect(200)
+      .then((response) => {
+        // 2 ads
+        expect(response.body).toHaveLength(2);
+      });
+
     await request(app.getHttpServer())
       .get('/users')
       .expect(200)
       .then((response) => {
-        expect(response.body.length).toBe(1);
-        expect(response.body[0].firstName).toBe('Hamid');
-        expect(response.body[0].lastName).toBe('Zahir');
+        // 4 users
+        expect(response.body).toHaveLength(4);
       });
+
+    // let's say Sarah and Simone match all ads
+    // Marouane matches the crypto ad and Hamid matches the fashion ad
+    const marouane = users.find((user) => user.firstName === 'Marouane');
+    const hamid = users.find((user) => user.firstName === 'Hamid');
+    const simone = users.find((user) => user.firstName === 'Simone');
+    const sarah = users.find((user) => user.firstName === 'Sarah');
+
+    const cryptoAd = ads.find((ad) => ad.targetingCriteria === 'crypto');
+    const fashionAd = ads.find((ad) => ad.targetingCriteria === 'fashion');
+
+    // Oops notifying twice is Okay
+    await helpers.notifyUserMatchedAd(simone, cryptoAd);
+    await helpers.notifyUserMatchedAd(simone, cryptoAd);
+
+    await helpers.notifyUserMatchedAd(simone, fashionAd);
+    await helpers.notifyUserMatchedAd(sarah, cryptoAd);
+    await helpers.notifyUserMatchedAd(sarah, fashionAd);
+    await helpers.notifyUserMatchedAd(marouane, cryptoAd);
+    await helpers.notifyUserMatchedAd(hamid, fashionAd);
+
+    // Mobile app can see that the system updates when requesting user data
+    // for each user
+    // Simone matches both ads
+    await helpers.fetchMatchedAds(simone.id).then((ads) => {
+      expect(ads).toHaveLength(2);
+      expect(ads.map((ad: User_Ad) => ad.ad).sort()).toEqual(
+        [fashionAd, cryptoAd].map((ad) => ad.id).sort(),
+      );
+    });
+
+    // Sarah matches both ads
+    await helpers.fetchMatchedAds(sarah.id).then((ads) => {
+      expect(ads).toHaveLength(2);
+      expect(ads.map((ad: User_Ad) => ad.ad).sort()).toEqual(
+        [fashionAd, cryptoAd].map((ad) => ad.id).sort(),
+      );
+    });
+
+    // Marouane matches the crypto ad
+    await helpers.fetchMatchedAds(marouane.id).then((ads) => {
+      expect(ads).toHaveLength(1);
+      expect(ads[0].ad).toEqual(cryptoAd.id);
+    });
+
+    // Hamid matches the fashion ad
+    await helpers.fetchMatchedAds(hamid.id).then((ads) => {
+      expect(ads).toHaveLength(1);
+      expect(ads[0].ad).toEqual(fashionAd.id);
+    });
+
+    // Notifying that both Simone and Sarah read the fashion ad
+    // and Marouane read the crypto ad
+    await helpers.notifyUserReadAd(simone, fashionAd, 20);
+    await helpers.notifyUserReadAd(sarah, fashionAd, 15);
+    await helpers.notifyUserReadAd(marouane, cryptoAd, 10);
+
+    // Checking the system
+    // System shows that simone has indeed read the fashion ad for 20 seconds
+    await helpers.fetchReadAds(simone.id).then((ads) => {
+      expect(ads).toHaveLength(1);
+      expect(ads[0].ad).toEqual(fashionAd.id);
+      expect(ads[0].period).toBe(20);
+    });
+
+    // System shows that sarah has read the fashion ad for 15 seconds
+    await helpers.fetchReadAds(sarah.id).then((ads) => {
+      expect(ads).toHaveLength(1);
+      expect(ads[0].ad).toEqual(fashionAd.id);
+      expect(ads[0].period).toBe(15);
+    });
+
+    // System shows that marouane has read the crypto ad for 10 seconds
+    await helpers.fetchReadAds(marouane.id).then((ads) => {
+      expect(ads).toHaveLength(1);
+      expect(ads[0].ad).toEqual(cryptoAd.id);
+      expect(ads[0].period).toBe(10);
+    });
+
+    // System shows that hamid has not read any ad
+    await helpers.fetchReadAds(hamid.id).then((ads) => {
+      expect(ads).toHaveLength(0);
+    });
   });
 });

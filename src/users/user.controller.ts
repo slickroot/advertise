@@ -1,5 +1,5 @@
 import { InjectModel } from '@nestjs/sequelize';
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { User } from './user.model';
 
 @Controller('users')
@@ -8,6 +8,13 @@ export class UserController {
     @InjectModel(User)
     private userModel: typeof User,
   ) {}
+
+  @Get(':id')
+  async get(@Param('id') id: string) {
+    return this.userModel.findOne({
+      where: { id },
+    });
+  }
 
   @Get()
   all() {
