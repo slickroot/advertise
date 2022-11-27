@@ -2,7 +2,7 @@ import { InjectModel } from '@nestjs/sequelize';
 import { Controller, Post } from '@nestjs/common';
 import { User } from '../users/user.model';
 import { Ad } from '../ads/ad.model';
-import { User_Ad } from 'src/hooks/user_ad.model';
+import { User_Ad } from '../hooks/user_ad.model';
 
 @Controller('seed')
 export class SeederController {

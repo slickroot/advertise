@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { UsersModule } from './users/users.module';
 import { AdsModule } from './ads/ads.module';
@@ -27,7 +25,5 @@ import { SeederModule } from './seeder/seeder.module';
     HooksModule,
     SeederModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}
