@@ -172,5 +172,24 @@ describe('AppController (e2e)', () => {
     await helpers.fetchReadAds(hamid.id).then((ads) => {
       expect(ads).toHaveLength(0);
     });
+
+    // Checking the reports
+    await request(app.getHttpServer())
+      .get('/reports')
+      .expect(200)
+      .then((response) => {
+        const { avg_read_rate } = response.body;
+        expect(avg_read_rate).toBe(15);
+      });
+
+    await request(app.getHttpServer())
+      .get(`/reports/ads/${fashionAd.id}`)
+      .expect(200)
+      .then((response) => {
+        const { rate_of_users_matched } = response.body;
+        expect(rate_of_users_matched).toBe(0.75);
+        const { rate_of_users_read } = response.body;
+        expect(rate_of_users_read).toBe(0.67);
+      });
   });
 });
